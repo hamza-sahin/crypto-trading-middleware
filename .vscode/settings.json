@@ -1,0 +1,4 @@
+{
+    "appService.defaultWebAppToDeploy": "/subscriptions/c02b1474-ace1-4243-9cd7-6b3edc49a857/microsoft.web/sites/subscriptions/c02b1474-ace1-4243-9cd7-6b3edc49a857/resourceGroups/appsvc_linux_centralus/providers/Microsoft.Web/sites/monsterader-test",
+    "appService.deploySubpath": "."
+}
