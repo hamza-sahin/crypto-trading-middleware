@@ -10,8 +10,6 @@ const Actions = {
     Buy: "buy"
 }
 
-const tick = 0.01;
-
 const Types = {
     CloseBuy: "CLOSE_BUY",
     CloseSell: "CLOSE_SELL",
@@ -46,9 +44,9 @@ const run = async (req, res) => {
     const limitSide = req.body.trade.action == Actions.Buy ? Actions.Sell : Actions.Buy
     const slMultiplier = req.body.trade.action == Actions.Buy ? -1 : 1
     const tpMultiplier = req.body.trade.action == Actions.Buy ? 1 : -1
-    const slInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * tick * slMultiplier));
-    const tpInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * tick * tpMultiplier));
-    
+    const slInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * slMultiplier));
+    const tpInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * tpMultiplier));
+
     const openPositions = await getOpenPositions();
 
     if (openPositions.length > 0) {
@@ -78,7 +76,7 @@ const run = async (req, res) => {
             ];
             await Promise.all(tasks);
         }
-        if (req.body.type === Types.CloseBuy || req.body.type === Types.CloseSell){
+        else if (req.body.type === Types.CloseBuy || req.body.type === Types.CloseSell){
             const tasks = [
                 binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, req.body.trade.contracts),
                 await binanceClient.cancelAllOrders(req.params.symbol),
