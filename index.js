@@ -50,9 +50,18 @@ const run = async (req, res) => {
     const openPosition = await getOpenPositions(req.params.symbol);
 
     if (openPosition) {
-        if (req.body.type === Types.Buy || req.body.type === Types.Sell || req.body.type === Types.Sltp){
+        if (req.body.type === Types.Buy || req.body.type === Types.Sell){
             const tasks = [
                 binanceClient.createMarketOrder(req.params.symbol, limitSide, Math.abs(openPosition.positionAmt)),
+                binanceClient.cancelAllOrders(req.params.symbol),
+                broadcastMessage(req, 0, 0)
+            ];
+            await Promise.all(tasks);
+            return;
+        }
+        if (req.body.type === Types.Sltp){
+            const tasks = [
+                binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, Math.abs(openPosition.positionAmt)),
                 binanceClient.cancelAllOrders(req.params.symbol),
                 broadcastMessage(req, 0, 0)
             ];
