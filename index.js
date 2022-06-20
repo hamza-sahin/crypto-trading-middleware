@@ -41,8 +41,8 @@ app.get('/trades', async (req, res) => {
 });
 
 const run = async (req, res) => {
-    const side = req.body.type === Types.Sltp ? req.body.trade.action : limitSide;
     const limitSide = req.body.trade.action == Actions.Buy ? Actions.Sell : Actions.Buy;
+    const side = req.body.type === Types.Sltp ? req.body.trade.action : limitSide;
     const slMultiplier = req.body.trade.action == Actions.Buy ? -1 : 1;
     const tpMultiplier = req.body.trade.action == Actions.Buy ? 1 : -1;
     const slInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * slMultiplier));
@@ -50,28 +50,31 @@ const run = async (req, res) => {
 
     const openPosition = await getOpenPositions(req.params.symbol);
 
+    const tasks = [];
+    // when there are open positions, close all positions no matter what
+    if (openPosition) {
+        tasks.push(
+            binanceClient.createMarketOrder(req.params.symbol, side, Math.abs(openPosition.positionAmt)),
+            binanceClient.cancelAllOrders(req.params.symbol),
+            broadcastMessage(req, 0, 0)
+        );
+    }
+    else if (req.body.type === Types.Buy || req.body.type === Types.Sell){
+        tasks.push(
+            binanceClient.createMarketOrder(req.params.symbol, side, req.body.trade.contracts),
+            binanceClient.createLimitOrder(req.params.symbol, limitSide, req.body.trade.contracts, slInPrice, params = {stopPrice: slInPrice}), 
+            binanceClient.createOrder(req.params.symbol, "TAKE_PROFIT", limitSide, req.body.trade.contracts, tpInPrice, params = {stopPrice: tpInPrice}),
+            broadcastMessage(req, slInPrice, tpInPrice)
+        );
+    }
+    else {
+        tasks.push(
+            binanceClient.cancelAllOrders(req.params.symbol)
+        );
+    }
+            
     try {
-        // when there are open positions, close all positions no matter what
-        if (openPosition) {
-            const tasks = [
-                binanceClient.createMarketOrder(req.params.symbol, side, Math.abs(openPosition.positionAmt)),
-                binanceClient.cancelAllOrders(req.params.symbol),
-                broadcastMessage(req, 0, 0)
-            ];
-            await Promise.all(tasks);
-        }
-        else if (req.body.type !== Types.Buy && req.body.type !== Types.Sell){
-            await binanceClient.cancelAllOrders(req.params.symbol);
-        }
-        else {
-            const tasks = [
-                binanceClient.createMarketOrder(req.params.symbol, side, req.body.trade.contracts),
-                binanceClient.createLimitOrder(req.params.symbol, limitSide, req.body.trade.contracts, slInPrice, params = {stopPrice: slInPrice}), 
-                binanceClient.createOrder(req.params.symbol, "TAKE_PROFIT", limitSide, req.body.trade.contracts, tpInPrice, params = {stopPrice: tpInPrice}),
-                broadcastMessage(req, slInPrice, tpInPrice)
-            ];
-            await Promise.all(tasks);
-        }
+        await Promise.all(tasks);
     } catch (error) {
         console.error(error, "\n TP: " + tpInPrice + "\n SL: " + slInPrice + "\n");
     }
@@ -91,7 +94,7 @@ const broadcastMessage = async (req, slInPrice, tpInPrice) => {
     "Leverage: " + req.body.trade.leverage;
 
     try {
-        await axios.get(TELEGRAM_API_PATH + message);
+        await axios.get(process.env.TELEGRAM_API_PATH + message);
     } catch (error) {
         console.log(error);
     }
