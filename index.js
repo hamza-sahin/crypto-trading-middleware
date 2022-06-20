@@ -48,7 +48,7 @@ const run = async (req, res) => {
     const tpInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * tpMultiplier));
 
     const openPosition = await getOpenPositions(req.params.symbol);
-    
+
     try {
         // when there are open positions, close all positions no matter what
         if (openPosition) {
@@ -60,11 +60,9 @@ const run = async (req, res) => {
                 broadcastMessage(req, 0, 0)
             ];
             await Promise.all(tasks);
-            return;
         }
         else if (req.body.type !== Types.Buy || req.body.type !== Types.Sell){
             await binanceClient.cancelAllOrders(req.params.symbol);
-            return;
         }
         else {
             const tasks = [
