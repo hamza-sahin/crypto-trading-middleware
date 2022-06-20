@@ -30,8 +30,8 @@ app.post('/placeorder/:symbol', (req, res) => {
     res.sendStatus(200);
 });
 
-app.get('/open-positions', async (req, res) => {
-    const response = await getOpenPositions();
+app.get('/open-positions/:symbol', async (req, res) => {
+    const response = await getOpenPositions(req.params.symbol);
     res.send(response);
 });
 
@@ -47,12 +47,12 @@ const run = async (req, res) => {
     const slInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * slMultiplier));
     const tpInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * tpMultiplier));
 
-    const openPositions = await getOpenPositions();
+    const openPosition = await getOpenPositions(req.params.symbol);
 
-    if (openPositions.length > 0) {
+    if (openPosition) {
         if (req.body.type === Types.Buy || req.body.type === Types.Sell || req.body.type === Types.Sltp){
             const tasks = [
-                binanceClient.createMarketOrder(req.params.symbol, limitSide, req.body.trade.contracts),
+                binanceClient.createMarketOrder(req.params.symbol, limitSide, Math.abs(openPosition.positionAmt)),
                 binanceClient.cancelAllOrders(req.params.symbol),
                 broadcastMessage(req, 0, 0)
             ];
@@ -65,8 +65,6 @@ const run = async (req, res) => {
     }
     
     try {
-        // create order only when there is a buy or sell signal
-        // otherwise, cancel all open orders
         if (req.body.type === Types.Buy || req.body.type === Types.Sell){
             const tasks = [
                 binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, req.body.trade.contracts),
@@ -78,8 +76,8 @@ const run = async (req, res) => {
         }
         else if (req.body.type === Types.CloseBuy || req.body.type === Types.CloseSell){
             const tasks = [
-                binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, req.body.trade.contracts),
-                await binanceClient.cancelAllOrders(req.params.symbol),
+                binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, Math.abs(openPosition.positionAmt)),
+                binanceClient.cancelAllOrders(req.params.symbol),
                 broadcastMessage(req, slInPrice, tpInPrice)
             ];
             await Promise.all(tasks);
@@ -93,10 +91,10 @@ const run = async (req, res) => {
     }
 }
 
-const getOpenPositions = async () => {
+const getOpenPositions = async (symbol) => {
     const balances = await binanceClient.fetchBalance();
-    const openPositions = balances.info.positions.filter(position => position.positionAmt != 0);
-    return openPositions
+    const openPositions = balances.info.positions.filter(position => position.positionAmt != 0 && position.symbol === symbol);
+    return openPositions[0]
 }
 
 const broadcastMessage = async (req, slInPrice, tpInPrice) => {
