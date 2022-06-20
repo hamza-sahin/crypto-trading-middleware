@@ -41,9 +41,10 @@ app.get('/trades', async (req, res) => {
 });
 
 const run = async (req, res) => {
-    const limitSide = req.body.trade.action == Actions.Buy ? Actions.Sell : Actions.Buy
-    const slMultiplier = req.body.trade.action == Actions.Buy ? -1 : 1
-    const tpMultiplier = req.body.trade.action == Actions.Buy ? 1 : -1
+    const side = req.body.type === Types.Sltp ? req.body.trade.action : limitSide;
+    const limitSide = req.body.trade.action == Actions.Buy ? Actions.Sell : Actions.Buy;
+    const slMultiplier = req.body.trade.action == Actions.Buy ? -1 : 1;
+    const tpMultiplier = req.body.trade.action == Actions.Buy ? 1 : -1;
     const slInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * slMultiplier));
     const tpInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * tpMultiplier));
 
@@ -52,8 +53,6 @@ const run = async (req, res) => {
     try {
         // when there are open positions, close all positions no matter what
         if (openPosition) {
-            const side = req.body.type === Types.Sltp ? req.body.trade.action : limitSide;
-            
             const tasks = [
                 binanceClient.createMarketOrder(req.params.symbol, side, Math.abs(openPosition.positionAmt)),
                 binanceClient.cancelAllOrders(req.params.symbol),
@@ -61,12 +60,12 @@ const run = async (req, res) => {
             ];
             await Promise.all(tasks);
         }
-        else if (req.body.type !== Types.Buy || req.body.type !== Types.Sell){
+        else if (req.body.type !== Types.Buy && req.body.type !== Types.Sell){
             await binanceClient.cancelAllOrders(req.params.symbol);
         }
         else {
             const tasks = [
-                binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, req.body.trade.contracts),
+                binanceClient.createMarketOrder(req.params.symbol, side, req.body.trade.contracts),
                 binanceClient.createLimitOrder(req.params.symbol, limitSide, req.body.trade.contracts, slInPrice, params = {stopPrice: slInPrice}), 
                 binanceClient.createOrder(req.params.symbol, "TAKE_PROFIT", limitSide, req.body.trade.contracts, tpInPrice, params = {stopPrice: tpInPrice}),
                 broadcastMessage(req, slInPrice, tpInPrice)
@@ -85,7 +84,7 @@ const getOpenPositions = async (symbol) => {
 }
 
 const broadcastMessage = async (req, slInPrice, tpInPrice) => {
-    const message = req.body.type + " BTC/BUSD " + req.body.trade.contracts + "\n" +
+    const message = req.body.type + " " + req.params.symbol + " " + req.body.trade.contracts + "\n" +
     "Entry Price: " + req.body.trade.entry_price.toFixed(2) + "\n" +
     "SL: " + slInPrice.toFixed(2) + "\n" +
     "TP: " + tpInPrice.toFixed(2) + "\n" +
