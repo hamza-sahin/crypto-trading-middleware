@@ -48,11 +48,12 @@ const run = async (req, res) => {
     const tpInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * tpMultiplier));
 
     const openPosition = await getOpenPositions(req.params.symbol);
-
-    if (openPosition) {
-        const side = req.body.type === Types.Sltp ? req.body.trade.action : limitSide;
-        
-        if (req.body.type !== Types.CloseBuy && req.body.type !== Types.CloseSell){
+    
+    try {
+        // when there are open positions, close all positions no matter what
+        if (openPosition) {
+            const side = req.body.type === Types.Sltp ? req.body.trade.action : limitSide;
+            
             const tasks = [
                 binanceClient.createMarketOrder(req.params.symbol, side, Math.abs(openPosition.positionAmt)),
                 binanceClient.cancelAllOrders(req.params.symbol),
@@ -61,13 +62,11 @@ const run = async (req, res) => {
             await Promise.all(tasks);
             return;
         }
-    }
-    else if (req.body.type === Types.CloseBuy || req.body.type === Types.CloseSell){
-        return;
-    }
-    
-    try {
-        if (req.body.type === Types.Buy || req.body.type === Types.Sell){
+        else if (req.body.type !== Types.Buy || req.body.type !== Types.Sell){
+            await binanceClient.cancelAllOrders(req.params.symbol);
+            return;
+        }
+        else {
             const tasks = [
                 binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, req.body.trade.contracts),
                 binanceClient.createLimitOrder(req.params.symbol, limitSide, req.body.trade.contracts, slInPrice, params = {stopPrice: slInPrice}), 
@@ -75,18 +74,6 @@ const run = async (req, res) => {
                 broadcastMessage(req, slInPrice, tpInPrice)
             ];
             await Promise.all(tasks);
-        }
-        else if (req.body.type === Types.CloseBuy || req.body.type === Types.CloseSell){
-            const tasks = [
-                binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, Math.abs(openPosition.positionAmt)),
-                binanceClient.cancelAllOrders(req.params.symbol),
-                broadcastMessage(req, slInPrice, tpInPrice)
-            ];
-            await Promise.all(tasks);
-        }
-        else
-        {
-            await binanceClient.cancelAllOrders(req.params.symbol);
         }
     } catch (error) {
         console.error(error, "\n TP: " + tpInPrice + "\n SL: " + slInPrice + "\n");
