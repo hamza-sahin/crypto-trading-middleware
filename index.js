@@ -61,7 +61,7 @@ const run = async (req, res) => {
     }
     else if (req.body.type === Types.Buy || req.body.type === Types.Sell){
         tasks.push(
-            binanceClient.createMarketOrder(req.params.symbol, side, req.body.trade.contracts),
+            binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, req.body.trade.contracts),
             binanceClient.createLimitOrder(req.params.symbol, limitSide, req.body.trade.contracts, slInPrice, params = {stopPrice: slInPrice}), 
             binanceClient.createOrder(req.params.symbol, "TAKE_PROFIT", limitSide, req.body.trade.contracts, tpInPrice, params = {stopPrice: tpInPrice}),
             broadcastMessage(req, slInPrice, tpInPrice)
