@@ -42,7 +42,6 @@ app.get('/trades', async (req, res) => {
 
 const run = async (req, res) => {
     const limitSide = req.body.trade.action == Actions.Buy ? Actions.Sell : Actions.Buy;
-    const side = req.body.type === Types.Sltp ? req.body.trade.action : limitSide;
     const slMultiplier = req.body.trade.action == Actions.Buy ? -1 : 1;
     const tpMultiplier = req.body.trade.action == Actions.Buy ? 1 : -1;
     const slInPrice = (req.body.trade.entry_price + (req.body.trade.stop_loss * req.body.trade.tick * slMultiplier));
@@ -51,10 +50,17 @@ const run = async (req, res) => {
     const openPosition = await getOpenPositions(req.params.symbol);
 
     const tasks = [];
-    // when there are open positions, close all positions no matter what
     if (openPosition) {
+        if (req.body.type === Types.Buy || req.body.type === Types.Sell)
+        {
+            tasks.push(binanceClient.createMarketOrder(req.params.symbol, limitSide, Math.abs(openPosition.positionAmt)))
+        }
+        else 
+        {
+            tasks.push(binanceClient.createMarketOrder(req.params.symbol, req.body.trade.action, Math.abs(openPosition.positionAmt)))
+        }
+
         tasks.push(
-            binanceClient.createMarketOrder(req.params.symbol, side, Math.abs(openPosition.positionAmt)),
             binanceClient.cancelAllOrders(req.params.symbol),
             broadcastMessage(req, 0, 0)
         );
