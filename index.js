@@ -91,7 +91,7 @@ const getOpenPositions = async (symbol) => {
     const openPositions = balances.info.positions.filter(position => position.positionAmt != 0 && position.symbol === symbol);
     return openPositions[0]
 }
-
+// Telegram API
 const broadcastMessage = async (req, slInPrice, tpInPrice) => {
     const message = req.body.type + " " + req.params.symbol + " " + req.body.trade.contracts + "\n" +
     "Entry Price: " + req.body.trade.entry_price.toFixed(2) + "\n" +
