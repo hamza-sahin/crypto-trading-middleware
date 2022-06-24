@@ -100,7 +100,7 @@ const broadcastMessage = async (req, slInPrice, tpInPrice) => {
     "Leverage: " + req.body.trade.leverage;
 
     try {
-        await axios.get(process.env.TELEGRAM_API_PATH + message);
+        await axios.get("https://api.telegram.org/bot1025461661:AAHMJa3hKCAxk3LT6SqL6ZVubI9-27otJPY/sendMessage?chat_id=-1001625118195&text=" + message);
     } catch (error) {
         console.log(error);
     }
